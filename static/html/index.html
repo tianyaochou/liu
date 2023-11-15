@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Liu</title>
+    </head>
+    <body>
+        <h1>Feeds</h1>
+        <ul>
+            {{#each feeds}}
+            <li><a href="feeds/{{this.id}}">{{this.title}}</a></li>
+            {{/each}}
+        </ul>
+        <form action="/feeds" method="post">
+            <label>Url:</label><input type="url" name="url" id="form-url"><br>
+            <input type="submit" value="Subscribe">
+        </form>
+    </body>
+</html>

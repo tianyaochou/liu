@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+    <header>
+        <title>Liu - {{title}}</title>
+    </header>
+    <body>
+        <h1>{{title}}</h1>
+        <form action="/feeds/{{id}}/update" method="post">
+            <button type="submit">Update</button>
+        </form>
+        <form action="/feeds/{{id}}/delete" method="post">
+            <button type="submit">Unsubscribe</button>
+        </form>
+        <ul>
+            {{#each items}}
+            <li><a href="/items/{{this.id}}">{{this.title}}</a></li>
+            {{/each}}
+        </ul>
+    </body>
+</html>
