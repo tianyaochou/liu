@@ -1,7 +1,7 @@
 use actix_web::*;
-use liu_feed::api::*;
-use liu_feed::feed;
+use liu_feed::app::State;
 use liu_feed::site;
+use liu_feed::greader;
 use sqlx::PgPool;
 
 #[tokio::main]
@@ -17,8 +17,8 @@ async fn main() -> std::io::Result<()> {
         let reader_api = web::scope("")
             .guard(guard::Header("content-type", "application/json"))
             .app_data(data.clone())
-            .service(login)
-            .service(tags);
+            .service(greader::login)
+            .service(greader::tags);
         let site = web::scope("").app_data(data)
             .service(site::index)
             .service(site::create_feed)

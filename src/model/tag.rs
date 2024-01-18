@@ -1,6 +1,6 @@
-use crate::{feed::{Feed, self}, api::unread_count};
-use sqlx::*;
 use crate::error::Result;
+use crate::model::feed::Feed;
+use sqlx::*;
 
 #[derive(FromRow)]
 pub struct Tag {
@@ -37,7 +37,7 @@ impl Tag {
         let mut count: i64 = 0;
         for feed in feeds {
             count = count + feed.unread_count(pool).await?
-        };
+        }
         Ok(count)
     }
 }

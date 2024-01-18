@@ -10,6 +10,7 @@ create table items (
     id bigserial primary key,
     feed_id bigint not null references feeds(id) on delete cascade,
     hash text unique not null,
+    link text,
     title text not null,
     author text not null,
     content text not null,

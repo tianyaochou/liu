@@ -1,25 +1,15 @@
-use crate::{
-    feed::{self, Feed},
-    tag::*,
-};
+use crate::model::{feed::Feed, tag::Tag};
+use crate::app::State;
 use actix_web::{web::Query, *};
 use futures::future::join_all;
-use serde::{ser::SerializeSeq, Deserialize};
+use serde::Deserialize;
 use serde_json::json;
 use serde_json::Value as JsonValue;
-use sqlx::PgPool;
-use url::Url;
-use handlebars::Handlebars;
 
 #[derive(Deserialize)]
 struct LoginRequest {
     #[serde(rename = "Passwd")]
     passwd: String,
-}
-
-pub struct State<'a> {
-    pub pool: PgPool,
-    pub hb: Handlebars<'a>,
 }
 
 #[post("/accounts/ClientLogin")]
@@ -103,18 +93,22 @@ pub struct QuickAddQuery {
 pub async fn add_feed(query: Query<QuickAddQuery>, state: web::Data<State<'_>>) -> HttpResponse {
     let uri = query.quickadd.as_str();
     match Feed::add_and_update_feed(&state.pool, &uri).await {
-        Ok(feed) => HttpResponse::Ok().body(json!({
-            "numResults": 1,
-            "query": uri,
-            "streamId": format!("feed/{}", feed.id),
-            "streamName": feed.title
-        }).to_string()),
+        Ok(feed) => HttpResponse::Ok().body(
+            json!({
+                "numResults": 1,
+                "query": uri,
+                "streamId": format!("feed/{}", feed.id),
+                "streamName": feed.title
+            })
+            .to_string(),
+        ),
         Err(err) => {
             let response: JsonValue = json!({
                 "numResults": 0,
                 "error": "Cannot retrieve feed source"
             });
-            HttpResponse::Ok().body(response.to_string())},
+            HttpResponse::Ok().body(response.to_string())
+        }
     }
 }
 
@@ -153,7 +147,7 @@ pub async fn edit_feed(
 }
 
 #[get("/api/0/unread_count")]
-pub async fn unread_count(req: HttpRequest, state:web::Data<State<'_>>) -> HttpResponse {
+pub async fn unread_count(req: HttpRequest, state: web::Data<State<'_>>) -> HttpResponse {
     if !helper::check_token(&req).await {
         return HttpResponse::Forbidden().body("Authentication failed");
     }

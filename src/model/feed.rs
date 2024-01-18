@@ -1,11 +1,8 @@
 use crate::error::Result;
-use crate::{item::Item, tag::Tag};
-use actix_web::http::uri::Authority;
-use base64::{engine::general_purpose::STANDARD, Engine};
-use chrono::*;
-use md5::{Digest, Md5};
+use crate::model::{item::Item, tag::Tag};
+use chrono::{offset, DateTime, Utc};
+use md5::Digest;
 use sqlx::*;
-use sqlx::error::DatabaseError;
 
 #[derive(sqlx::FromRow)]
 pub struct Feed {
@@ -61,9 +58,11 @@ impl Feed {
         entry: &feed_rs::model::Entry,
     ) -> Result<()> {
         let content = entry
-            .content.clone()
+            .content
+            .clone()
             .map(|c| c.body.unwrap_or_default())
             .unwrap_or_default();
+        let link = entry.links.first().map(|l| l.href.as_str());
         let title = entry.title.clone().map(|t| t.content).unwrap_or_default();
         let author = entry
             .authors
@@ -72,7 +71,7 @@ impl Feed {
         let created_at = entry.published.unwrap_or_default();
         let updated_at = entry.updated.unwrap_or_default();
         let _ = Item::create(
-            pool, self.id, &title, &author, &content, created_at, updated_at,
+            pool, self.id, link, &title, &author, &content, created_at, updated_at,
         )
         .await;
         Ok(())
@@ -99,7 +98,7 @@ impl Feed {
     }
 
     pub async fn items(&self, pool: &PgPool) -> Result<Vec<Item>> {
-        let items = query_as!(Item, "select id, feed_id, hash, title, author, content, created_at, updated_at, read, star from items where feed_id = $1 order by updated_at desc", self.id)
+        let items = query_as!(Item, "select id, feed_id, hash, link, title, author, content, created_at, updated_at, read, star from items where feed_id = $1 order by updated_at desc", self.id)
         .fetch_all(pool).await?;
         Ok(items)
     }
@@ -162,49 +161,41 @@ impl Feed {
         .await?;
         Ok(feed)
     }
+
+    pub async fn add_feed(pool: &PgPool, uri: &str, feed: &feed_rs::model::Feed) -> Result<Feed> {
+        Self::create_from_feed(pool, uri, feed).await
+    }
+
+    pub async fn add_feed_from_uri(pool: &PgPool, uri: &str) -> Result<Feed> {
+        let feed = get_feed(uri).await?;
+        Self::add_feed(pool, uri, &feed).await
+    }
+
+    pub async fn add_and_update_feed(pool: &PgPool, uri: &str) -> Result<Feed> {
+        let raw_feed = get_feed(uri).await?;
+        let mut feed = Self::add_feed(pool, uri, &raw_feed).await?;
+        feed.update_feed_from_feed(pool, &raw_feed).await?;
+        Ok(feed)
+    }
+
+    pub async fn update_feed_from_feed(
+        &mut self,
+        pool: &PgPool,
+        feed: &feed_rs::model::Feed,
+    ) -> Result<()> {
+        for entry in feed.entries.iter() {
+            self.create_item_from_entry(pool, entry).await.unwrap();
+        }
+        Ok(())
+    }
+
+    pub async fn update_feed(&mut self, pool: &PgPool) -> Result<()> {
+        let f = get_feed(&self.feed_uri).await?;
+        self.update_feed_from_feed(pool, &f).await
+    }
 }
 
-pub mod update {
-    use super::Feed;
-    use crate::{api::add_feed, error::Result};
-    use sqlx::PgPool;
-
-    pub async fn get_feed(uri: &str) -> Result<feed_rs::model::Feed> {
-        let src = reqwest::get(uri).await?.text().await?;
-        Ok(feed_rs::parser::parse(src.as_bytes())?)
-    }
-
-    impl Feed {
-        pub async fn add_feed(
-            pool: &PgPool,
-            uri: &str,
-            feed: &feed_rs::model::Feed,
-        ) -> Result<Feed> {
-            Self::create_from_feed(pool, uri, feed).await
-        }
-
-        pub async fn add_feed_from_uri(pool: &PgPool, uri: &str) -> Result<Feed> {
-            let feed = get_feed(uri).await?;
-            Self::add_feed(pool, uri, &feed).await
-        }
-
-        pub async fn add_and_update_feed(pool: &PgPool, uri: &str) -> Result<Feed> {
-            let raw_feed = get_feed(uri).await?;
-            let mut feed = Self::add_feed(pool, uri, &raw_feed).await?;
-            feed.update_feed_from_feed(pool, &raw_feed).await?;
-            Ok(feed)
-        }
-
-        pub async fn update_feed_from_feed(&mut self, pool: &PgPool, feed: &feed_rs::model::Feed) -> Result<()> {
-            for entry in feed.entries.iter() {
-                self.create_item_from_entry(pool, entry).await.unwrap();
-            }
-            Ok(())
-        }
-
-        pub async fn update_feed(&mut self, pool: &PgPool) -> Result<()> {
-            let f = get_feed(&self.feed_uri).await?;
-            self.update_feed_from_feed(pool, &f).await
-        }
-    }
+pub async fn get_feed(uri: &str) -> Result<feed_rs::model::Feed> {
+    let src = reqwest::get(uri).await?.text().await?;
+    Ok(feed_rs::parser::parse(src.as_bytes())?)
 }

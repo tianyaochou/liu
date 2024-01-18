@@ -3,6 +3,7 @@ use std::fmt::write;
 use sqlx::Error as DBError;
 use reqwest::Error as ReqError;
 use feed_rs::parser::ParseFeedError;
+use handlebars::RenderError;
 
 #[derive(std::fmt::Debug)]
 pub enum AppError {

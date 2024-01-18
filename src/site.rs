@@ -1,14 +1,12 @@
-use std::collections::HashMap;
-
-use crate::{api::State, feed::Feed, item::Item, tag::*};
-use actix_web::{web::Query, *};
-use futures::future::join_all;
+use crate::{
+    app::State,
+    model::{feed::Feed, item::Item},
+};
+use actix_web::*;
 use handlebars::Handlebars;
-use serde::{ser::SerializeSeq, Deserialize};
+use serde::Deserialize;
 use serde_json::json;
-use serde_json::Value as JsonValue;
 use sqlx::PgPool;
-use url::Url;
 
 impl Feed {
     pub async fn render(&self, pool: &PgPool, hb: &Handlebars<'_>, template: &str) -> String {
@@ -35,7 +33,8 @@ impl Item {
             "content": self.content
         });
         hb.render(template, &data).unwrap()
-}}
+    }
+}
 
 #[get("/")]
 pub async fn index(state: web::Data<State<'_>>) -> impl Responder {
